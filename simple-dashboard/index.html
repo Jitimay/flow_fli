@@ -236,6 +236,28 @@
             50% { transform: scale(1.05); opacity: 0.8; }
         }
         
+        .message.success {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+        }
+        
+        .message.error {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+        }
+        
+        .message.processing {
+            background: linear-gradient(45deg, #FF9800, #f57c00);
+            color: white;
+        }
+        
+        .amount-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+        }
+        
         .winning-features {
             background: linear-gradient(45deg, #ff6b6b, #feca57);
             color: white;
@@ -413,25 +435,40 @@
         </div>
 
         <div class="control-panel">
-            <h3><i class="fas fa-gamepad"></i> Live Demo Controls - Show the Judges!</h3>
+            <h3><i class="fas fa-shopping-cart"></i> Purchase Water</h3>
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+                <input type="number" class="amount-input" id="purchaseAmount" value="2.50" min="0.50" step="0.25" placeholder="Amount ($)" style="padding: 15px 20px; font-size: 1.2rem; border: 2px solid #e0e0e0; border-radius: 12px; background: #f8f9fa; transition: all 0.3s ease; min-width: 150px;">
+                <button class="demo-btn btn-primary" onclick="purchaseWaterReal()" style="padding: 15px 30px; font-size: 1.2rem;">
+                    <i class="fas fa-credit-card"></i> Purchase Water
+                </button>
+            </div>
+            <div class="quick-amounts" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px;">
+                <button class="demo-btn" style="padding: 10px; font-size: 0.9rem;" onclick="setQuickAmount(1.00)">$1.00</button>
+                <button class="demo-btn" style="padding: 10px; font-size: 0.9rem;" onclick="setQuickAmount(2.50)">$2.50</button>
+                <button class="demo-btn" style="padding: 10px; font-size: 0.9rem;" onclick="setQuickAmount(5.00)">$5.00</button>
+                <button class="demo-btn" style="padding: 10px; font-size: 0.9rem;" onclick="setQuickAmount(10.00)">$10.00</button>
+            </div>
+            <div class="message" id="purchaseMessage" style="display: none; padding: 15px 20px; border-radius: 12px; font-weight: 500; margin-top: 15px;"></div>
+            
+            <h4 style="margin-top: 30px;"><i class="fas fa-gamepad"></i> Demo Controls</h4>
             <div class="demo-controls">
-                <button class="demo-btn btn-primary" onclick="simulateNormalPurchase()">
-                    <i class="fas fa-shopping-cart"></i> Normal Purchase
+                <button class="demo-btn btn-success" onclick="simulateNormalPurchase()">
+                    <i class="fas fa-check"></i> Demo: Normal Purchase
                 </button>
                 <button class="demo-btn btn-danger" onclick="simulateFraudAttempt()">
-                    <i class="fas fa-exclamation-triangle"></i> Fraud Attempt
+                    <i class="fas fa-exclamation-triangle"></i> Demo: Fraud Attempt
                 </button>
-                <button class="demo-btn btn-success" onclick="simulateHardwareControl()">
-                    <i class="fas fa-cog"></i> Hardware Control
+                <button class="demo-btn btn-warning" onclick="simulateHardwareControl()">
+                    <i class="fas fa-cog"></i> Demo: Hardware Control
                 </button>
-                <button class="demo-btn btn-warning" onclick="simulateIoTData()">
-                    <i class="fas fa-wifi"></i> IoT Sensors
+                <button class="demo-btn btn-primary" onclick="simulateIoTData()">
+                    <i class="fas fa-wifi"></i> Demo: IoT Sensors
                 </button>
                 <button class="demo-btn btn-primary" onclick="simulateATPIntegration()">
-                    <i class="fas fa-coins"></i> ATP Tokenization
+                    <i class="fas fa-coins"></i> Demo: ATP Integration
                 </button>
                 <button class="demo-btn btn-success" onclick="showGlobalImpact()">
-                    <i class="fas fa-globe"></i> Global Impact
+                    <i class="fas fa-globe"></i> Demo: Global Impact
                 </button>
             </div>
         </div>
@@ -515,6 +552,75 @@
             const timestamp = new Date().toLocaleTimeString();
             element.innerHTML += `[${timestamp}] ${message}<br>`;
             element.scrollTop = element.scrollHeight;
+        }
+        
+        function setQuickAmount(amount) {
+            document.getElementById('purchaseAmount').value = amount.toFixed(2);
+        }
+        
+        async function purchaseWaterReal() {
+            const amount = parseFloat(document.getElementById('purchaseAmount').value);
+            const messageDiv = document.getElementById('purchaseMessage');
+            
+            if (amount < 0.50) {
+                showPurchaseMessage('error', 'Minimum purchase amount is $0.50');
+                return;
+            }
+            
+            try {
+                showPurchaseMessage('processing', 'Processing payment... Please wait.');
+                addSystemLog(`[REAL PURCHASE] Processing $${amount.toFixed(2)} payment...`);
+                
+                const response = await fetch(`${API_URL}/payment/process`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: amount,
+                        source: `dashboard-user-${Date.now()}`
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showPurchaseMessage('success', `✅ Payment successful! Transaction: ${result.transactionId}`);
+                    addSystemLog(`[SUCCESS] Payment processed - Transaction: ${result.transactionId}`);
+                    addSystemLog(`[PUMP] Water pump activated for ${Math.round(amount * 10)} seconds`);
+                    
+                    // Update logs in feature cards
+                    addFeatureLog('agentLog', `[AGENT] Real payment: $${amount.toFixed(2)}`);
+                    addFeatureLog('agentLog', `[AGENT] Transaction approved: ${result.transactionId}`);
+                    addFeatureLog('hardwareLog', '[HARDWARE] Pump relay activated');
+                    addFeatureLog('atpLog', '[ATP] Transaction logged on-chain');
+                    
+                    fraudScore = result.fraudScore || 0.1;
+                    chainLogs++;
+                    document.getElementById('chainLogs').textContent = chainLogs.toLocaleString();
+                } else {
+                    showPurchaseMessage('error', `❌ ${result.message}`);
+                    addSystemLog(`[ERROR] Payment failed: ${result.message}`);
+                    
+                    if (result.fraudDetected) {
+                        addFeatureLog('fraudLog', `[FRAUD] Transaction blocked: $${amount.toFixed(2)}`);
+                        fraudScore = 0.9;
+                    }
+                }
+            } catch (error) {
+                showPurchaseMessage('error', `❌ Payment failed: ${error.message}`);
+                addSystemLog(`[ERROR] Network error: ${error.message}`);
+            }
+        }
+        
+        function showPurchaseMessage(type, text) {
+            const messageDiv = document.getElementById('purchaseMessage');
+            messageDiv.style.display = 'block';
+            messageDiv.className = `message ${type}`;
+            messageDiv.innerHTML = text;
+            
+            // Auto-hide after 8 seconds
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 8000);
         }
         
         // Demo functions to showcase features
